@@ -1,0 +1,53 @@
+# 独立融合实验：软覆盖度门控 + 个股历史覆盖加权 + 可选行业分数 z-score。
+# 不重训、不改 configs/gru_no_today_recent_n2000.yaml，不覆盖 n2000 基线产物。
+# 先复算硬门控 0.117177 配方，再在 valid 上搜新门控并写入 experiments.md。
+
+include: configs/default.yaml
+
+experiment_id: fusion-n2000-softgate-001
+
+baseline:
+  experiment_id: gru-no-today-recent-n2000-001
+  documented_valid_rankic: 0.117177
+  target_valid_rankic: 0.12
+  space: raw
+  tau_q: 0.6
+  weight_low: 0.25
+  weight_high: 0.4
+  mlp_space: rank
+  mlp_weight: 0.15
+  hard: true
+
+inputs:
+  temporal_valid: outputs/gru_no_today_recent_n2000_valid.npy
+  temporal_test: outputs/gru_no_today_recent_n2000_test.npy
+  cross_section_valid: outputs/fusion_valid.npy
+  cross_section_test: outputs/fusion_test.npy
+  mlp_valid: outputs/cs_mlp_valid.npy
+  mlp_test: outputs/cs_mlp_test.npy
+  industry_col: 6
+  aux_temporal_valid: outputs/gru_n2000_winjitter_valid.npy
+  aux_temporal_test: outputs/gru_n2000_winjitter_test.npy
+
+gate:
+  lookback: 10
+  spaces: [raw, rank]
+  group_z: [false, true]
+  tau_qs: [0.5, 0.6, 0.7]
+  temperatures: [80, 200, 450]
+  weight_pairs:
+    - [0.2, 0.4]
+    - [0.25, 0.4]
+    - [0.25, 0.5]
+    - [0.15, 0.45]
+  stock_boosts: [0.0, 0.08, 0.12, 0.18]
+  stock_temps: [0.12, 0.2]
+  mlp_weights: [0.1, 0.15, 0.2, 0.25]
+  aux_mix: [0.0, 0.3, 0.5]
+
+paths:
+  valid_pred: outputs/fusion_n2000_softgate_valid.npy
+  test_pred: outputs/fusion_n2000_softgate_test.npy
+  submission: submissions/task1_fusion_n2000_softgate.npy
+  lock: outputs/fusion_n2000_softgate_lock.json
+  ablation: outputs/fusion_n2000_softgate_ablation.json

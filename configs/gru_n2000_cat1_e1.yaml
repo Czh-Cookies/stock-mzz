@@ -1,0 +1,16 @@
+# 冠军 GRU 只加 cat_1 embedding（不用 cat_6）。旧 gru_cats 是 1+6 且无 69/73。epoch=1。
+
+include: configs/gru_n2000_add6973_e1.yaml
+
+features:
+  cat_indices: [1]
+  cat_embed_dim: 8
+
+model:
+  max_epochs: 1
+
+paths:
+  checkpoint: checkpoints/gru_n2000_cat1_e1.pt
+  valid_pred: outputs/gru_n2000_cat1_e1_valid.npy
+  test_pred: outputs/gru_n2000_cat1_e1_test.npy
+  submission: submissions/task1_gru_n2000_cat1_e1.npy

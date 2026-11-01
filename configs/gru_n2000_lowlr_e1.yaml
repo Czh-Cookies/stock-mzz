@@ -1,0 +1,15 @@
+# 加载已收敛 n2000，全参数用 lr=1e-4 再走 1 个 epoch。不冻主干。不改基线 yaml。
+
+include: configs/gru_no_today_recent_n2000.yaml
+
+model:
+  max_epochs: 1
+  lr: 0.0001
+  freeze_backbone: false
+
+paths:
+  init_checkpoint: checkpoints/gru_no_today_recent_n2000.pt
+  checkpoint: checkpoints/gru_n2000_lowlr_e1.pt
+  valid_pred: outputs/gru_n2000_lowlr_e1_valid.npy
+  test_pred: outputs/gru_n2000_lowlr_e1_test.npy
+  submission: submissions/task1_gru_n2000_lowlr_e1.npy

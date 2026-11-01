@@ -1,0 +1,13 @@
+# 相对已上线 69+73：MSE + 成对 logistic 排序损失。不改采样、不改门控。
+
+include: configs/gru_n2000_add6973_e1.yaml
+
+model:
+  max_epochs: 1
+  rank_loss_weight: 0.3
+
+paths:
+  checkpoint: checkpoints/gru_n2000_pairrank_e1.pt
+  valid_pred: outputs/gru_n2000_pairrank_e1_valid.npy
+  test_pred: outputs/gru_n2000_pairrank_e1_test.npy
+  submission: submissions/task1_gru_n2000_pairrank_e1.npy

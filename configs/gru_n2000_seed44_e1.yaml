@@ -1,0 +1,14 @@
+# 相对 n2000 只换 seed=44，其余不变。epoch=1。不修改基线 yaml，不覆盖 n2000 产物。
+
+include: configs/gru_no_today_recent_n2000.yaml
+
+seed: 44
+
+model:
+  max_epochs: 1
+
+paths:
+  checkpoint: checkpoints/gru_n2000_seed44_e1.pt
+  valid_pred: outputs/gru_n2000_seed44_e1_valid.npy
+  test_pred: outputs/gru_n2000_seed44_e1_test.npy
+  submission: submissions/task1_gru_n2000_seed44_e1.npy

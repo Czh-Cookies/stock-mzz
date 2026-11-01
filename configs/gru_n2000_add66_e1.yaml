@@ -1,0 +1,15 @@
+# 相对已上线 add6973 只加 1 列：66（Top15 中离 73/41 簇较远）。不叠加已失败的 74/42。
+
+include: configs/gru_no_today_recent_n2000.yaml
+
+features:
+  num_indices: [5, 6, 7, 8, 10, 11, 17, 18, 19, 20, 21, 22, 24, 25, 39, 40, 41, 57, 66, 68, 69, 70, 73, 90]
+
+model:
+  max_epochs: 1
+
+paths:
+  checkpoint: checkpoints/gru_n2000_add66_e1.pt
+  valid_pred: outputs/gru_n2000_add66_e1_valid.npy
+  test_pred: outputs/gru_n2000_add66_e1_test.npy
+  submission: submissions/task1_gru_n2000_add66_e1.npy

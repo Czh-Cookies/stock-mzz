@@ -221,6 +221,7 @@ __marimo__/
 configs/local.yaml
 
 # Contest data and artifacts (confidential — never commit)
+/data.z
 data/
 datasets/
 raw/

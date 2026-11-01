@@ -1,0 +1,22 @@
+# 实验标记：gru_full_balance_sample_e1
+# 只改训练抽样：历史覆盖过滤 + 行业分层；epoch=1。
+# 不 include、不修改 configs/gru_no_today_recent_n2000.yaml。
+
+include: configs/gru_no_today_recent.yaml
+
+seed: 42
+
+features:
+  max_train_stocks_per_day: 3200
+  sample_mode: industry_balanced
+  industry_col: 6
+  min_history_coverage: 0.3
+
+model:
+  max_epochs: 1
+
+paths:
+  checkpoint: checkpoints/gru_full_balance_sample_e1.pt
+  valid_pred: outputs/gru_full_balance_sample_e1_valid.npy
+  test_pred: outputs/gru_full_balance_sample_e1_test.npy
+  submission: submissions/task1_gru_full_balance_sample_e1.npy

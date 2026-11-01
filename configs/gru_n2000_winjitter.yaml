@@ -1,0 +1,16 @@
+# 相对 gru-no-today-recent-n2000-001：只在训练窗口上对非最后一步做随机置零。
+# 不改 L=10、不含当天、末 800 天、每天 2000 只、MSE。不覆盖 n2000 基线产物。
+
+include: configs/gru_no_today_recent_n2000.yaml
+
+features:
+  window_jitter: 0.15
+
+model:
+  max_epochs: 1
+
+paths:
+  checkpoint: checkpoints/gru_n2000_winjitter.pt
+  valid_pred: outputs/gru_n2000_winjitter_valid.npy
+  test_pred: outputs/gru_n2000_winjitter_test.npy
+  submission: submissions/task1_gru_n2000_winjitter.npy

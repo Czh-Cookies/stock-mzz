@@ -1,0 +1,17 @@
+# 方向3：相对 n2000 只收紧 CS clip，并按窗口覆盖度加权 MSE。epoch=1。
+# include 基线 yaml，不修改该文件。不覆盖 n2000 checkpoint / task1_y1_upload.npy。
+
+include: configs/gru_no_today_recent_n2000.yaml
+
+features:
+  clip: 3.0
+
+model:
+  max_epochs: 1
+  loss_weight: history_coverage
+
+paths:
+  checkpoint: checkpoints/gru_n2000_clip3_covw_e1.pt
+  valid_pred: outputs/gru_n2000_clip3_covw_e1_valid.npy
+  test_pred: outputs/gru_n2000_clip3_covw_e1_test.npy
+  submission: submissions/task1_gru_n2000_clip3_covw_e1.npy

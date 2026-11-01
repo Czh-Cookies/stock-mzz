@@ -1,0 +1,16 @@
+# 漏洞：69+73 只在每天 2000 只上训，valid/test 却是全截面。
+# 全市场抽样以前没带 69+73。这里合并两件已验证的事。epoch=1。不改基线 yaml。
+
+include: configs/gru_no_today_recent_full.yaml
+
+features:
+  num_indices: [5, 6, 7, 8, 10, 11, 17, 18, 19, 20, 21, 22, 24, 25, 39, 40, 41, 57, 68, 69, 70, 73, 90]
+
+model:
+  max_epochs: 1
+
+paths:
+  checkpoint: checkpoints/gru_full_add6973_e1.pt
+  valid_pred: outputs/gru_full_add6973_e1_valid.npy
+  test_pred: outputs/gru_full_add6973_e1_test.npy
+  submission: submissions/task1_gru_full_add6973_e1.npy

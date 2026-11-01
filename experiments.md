@@ -2,7 +2,7 @@
 
 每次有效训练追加一条。没有数字的「大概好了」不算完成。对比实验一次只改窗口、特征集合、损失、模型四者之一。
 
-**当前最强：valid mean RankIC 0.117177**（`gru-no-today-recent-n2000-001` 叠覆盖度门控 + 原 cs_mlp）。门槛 0.12 未到。下面按时间排列，中间条目里的「当前最强」都是当时的话，已被这条覆盖。
+**当前最强：valid mean RankIC 0.122226**（`gru-ensemble-full-s43-001`）。valid 已过 0.12。
 
 ## cs-lgbm-001
 - 日期：2026-08-17
@@ -364,6 +364,48 @@
 - 诊断：Q4 0.1040→0.1072；与树相关 0.454→0.470
 - 结论：**作为当前 GRU 支。** 覆盖度门控 + 原 cs_mlp → **0.117177**。产物 `submissions/task1_fusion_recent_gru_n2000_cov_mlp.npy`，未覆盖 0.116。离 0.12 约 0.0028。
 - 下一步：若继续，同一 800 天把每天抽样提到全市场（约 3500–4200），只改这一项
+
+## gru-no-today-recent-full-001
+- 日期：2026-08-24
+- 代码/配置：`configs/gru_full_submit_e1.yaml + configs/fusion_full_hardgate.yaml`
+- 输入特征：全市场 GRU（末 800 天、不含当天）+ 冻结 fusion 树 + 原 cs_mlp
+- 是否看历史：窗口 = 10，[t-L, t)
+- 模型：同 n2000 GRU；每天训练股票 = 当日全部有标签票；覆盖度硬门控 + rank MLP
+- 损失：MSE；验收 RankIC
+- valid mean RankIC：0.121023
+- 对照基准 gru-no-today-recent-n2000-001 文档值：0.117177
+- 对照基准本机复算：0.117177
+- Δ vs 文档基准：0.003846
+- 消融：
+  - n2000_frozen_recipe: 0.117177（对照）
+  - full_frozen_recipe: 0.116887（只换 GRU）
+  - full_valid_grid: 0.121023（valid grid）
+- 锁定：tau_q=0.7, tau=4588.4, weight_low=0.2, weight_high=0.6, mlp_weight=0.1, note=valid grid
+- train mean RankIC（如有）：未算
+- 耗时 / 硬件：合计 30.6s
+- 结论：**作为新 GRU 支保留。** valid 0.121023，对照冻结 n2000 门控 0.117177。未覆盖 n2000 提交文件。
+- 下一步：若高于上一主候选，用 submissions/task1_fusion_full_hardgate.npy 再交一次。
+
+## gru-ensemble-full-s43-001
+- 日期：2026-08-24
+- 代码/配置：`configs/gru_full_seed43.yaml + configs/fusion_gru_ensemble.yaml`
+- 输入特征：n2000 GRU + 全市场 seed42 + 全市场 seed43 + 冻结树 + 原 cs_mlp
+- 是否看历史：窗口 = 10，[t-L, t)
+- 模型：GRU 浅融合后再覆盖度硬门控；valid 锁 mix 与门控
+- 损失：不重训树/MLP；验收 RankIC
+- valid mean RankIC：0.122226
+- 对照基准 gru-no-today-recent-n2000-001 文档值：0.121023
+- 对照基准本机复算：0.117177
+- Δ vs 文档基准：0.001203
+- 消融：
+  - n2000_frozen: 0.117177（0.117177）
+  - full_grid: 0.121023（上一刀）
+  - ensemble_grid: 0.122226（本刀）
+- 锁定：full_mix=0.0, s43_mix=0.0, tau_q=0.7, tau=4588.4, weight_low=0.15, weight_high=0.7, mlp_weight=0.15
+- train mean RankIC（如有）：未算
+- 耗时 / 硬件：合计 646.1s
+- 结论：**作为新候选。** valid 0.122226，对照上一刀 0.121023 / n2000 门控 0.117177。
+- 下一步：用 submissions/task1_fusion_gru_ensemble.npy 再交一次；不要覆盖 0.120075 那份备份。
 
 模板：
 

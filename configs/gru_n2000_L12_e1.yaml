@@ -1,0 +1,15 @@
+# 冠军 23 列不变，只把轨迹窗 10→12。epoch=1。
+
+include: configs/gru_n2000_add6973_e1.yaml
+
+features:
+  length: 12
+
+model:
+  max_epochs: 1
+
+paths:
+  checkpoint: checkpoints/gru_n2000_L12_e1.pt
+  valid_pred: outputs/gru_n2000_L12_e1_valid.npy
+  test_pred: outputs/gru_n2000_L12_e1_test.npy
+  submission: submissions/task1_gru_n2000_L12_e1.npy

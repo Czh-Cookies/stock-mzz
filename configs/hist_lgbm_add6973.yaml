@@ -1,0 +1,15 @@
+# 明天冲 0.123：树的历史块补上 GRU 已验证的 69、73。不改 hist_lgbm.yaml。
+# 截面 baseline 已含全部 99 列 raw，只改历史窗口列。
+
+include: configs/hist_lgbm.yaml
+
+features:
+  history:
+    num_indices: [5, 6, 7, 8, 10, 11, 17, 18, 19, 20, 21, 22, 24, 25, 39, 40, 41, 57, 68, 69, 70, 73, 90]
+
+paths:
+  checkpoint: checkpoints/hist_lgbm_add6973.txt
+  valid_pred: outputs/hist_lgbm_add6973_valid.npy
+  test_pred: outputs/hist_lgbm_add6973_test.npy
+  importance: outputs/hist_lgbm_add6973_importance.csv
+  submission: submissions/task1_hist_lgbm_add6973.npy

@@ -317,8 +317,13 @@ def gather_windows(
     stock_idx: np.ndarray,
     length: int,
     include_current: bool = True,
+    **kwargs: Any,
 ) -> np.ndarray:
     """Right-aligned windows ending at t (or t-1). Shape (B, L, F). Missing days are 0."""
+    if "include_current" in kwargs:
+        include_current = bool(kwargs.pop("include_current"))
+    if kwargs:
+        raise TypeError(f"unexpected gather_windows kwargs {sorted(kwargs)}")
     end = int(global_t) + (1 if include_current else 0)
     start = end - int(length)
     stock_idx = np.asarray(stock_idx, dtype=np.intp)
@@ -728,6 +733,55 @@ def _stratified_choice(
     return np.sort(np.concatenate(parts)) if parts else np.sort(idx[:k])
 
 
+def history_coverage_fraction(
+    mask_x: np.ndarray,
+    t: int,
+    length: int,
+    idx: np.ndarray,
+) -> np.ndarray:
+    """Share of days in [t-length, t) with mask_x. Causal; day t is not used."""
+    start = max(0, int(t) - int(length))
+    end = int(t)
+    idx = np.asarray(idx)
+    if end <= start or idx.size == 0:
+        return np.ones(idx.shape[0], dtype=np.float64)
+    win = np.asarray(mask_x[start:end], dtype=bool)[:, idx]
+    return win.mean(axis=0)
+
+
+def select_gru_train_idx(
+    *,
+    mask_y_t: np.ndarray,
+    mask_x: np.ndarray,
+    t: int,
+    length: int,
+    rng: np.random.Generator,
+    min_train_stocks: int = 8,
+    max_stocks: int | None = None,
+    sample_mode: str = "uniform",
+    groups_t: np.ndarray | None = None,
+    min_history_coverage: float = 0.0,
+) -> np.ndarray:
+    """Train-day stock index. Defaults match the old uniform cap (n2000-safe)."""
+    idx = np.flatnonzero(np.asarray(mask_y_t, dtype=bool))
+    if idx.size < int(min_train_stocks):
+        return idx
+    cov_cut = float(min_history_coverage or 0.0)
+    if cov_cut > 0:
+        cov = history_coverage_fraction(mask_x, t, length, idx)
+        kept = idx[cov >= cov_cut]
+        if kept.size >= int(min_train_stocks):
+            idx = kept
+    mode = str(sample_mode or "uniform").lower()
+    cap = int(max_stocks) if max_stocks else None
+    if cap is not None and idx.size > cap:
+        if mode in {"industry_balanced", "balanced"} and groups_t is not None:
+            idx = _stratified_choice(idx, np.asarray(groups_t)[idx], cap, rng)
+        else:
+            idx = np.sort(rng.choice(idx, size=cap, replace=False))
+    return np.sort(np.asarray(idx))
+
+
 def group_sizes(coords: np.ndarray) -> np.ndarray:
     """Consecutive per-day row counts. Rows must stay in time order."""
     t = np.asarray(coords[:, 0])
@@ -841,3 +895,9 @@ def flatten_masked_rows(
         cursor += idx.size
 
     return x, y, coords
+
+
+drop_task2_label = drop_task2_label
+dump_split_cache = dump_split_cache
+flatten_masked_rows = flatten_masked_rows
+within_day_relevance = within_day_relevance

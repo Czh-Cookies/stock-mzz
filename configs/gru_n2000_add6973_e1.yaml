@@ -1,0 +1,15 @@
+# 相对 n2000 只多两列：train 单因子 Top 里尚未进 GRU 的 69、73。epoch=1。不改基线 yaml。
+
+include: configs/gru_no_today_recent_n2000.yaml
+
+features:
+  num_indices: [5, 6, 7, 8, 10, 11, 17, 18, 19, 20, 21, 22, 24, 25, 39, 40, 41, 57, 68, 69, 70, 73, 90]
+
+model:
+  max_epochs: 1
+
+paths:
+  checkpoint: checkpoints/gru_n2000_add6973_e1.pt
+  valid_pred: outputs/gru_n2000_add6973_e1_valid.npy
+  test_pred: outputs/gru_n2000_add6973_e1_test.npy
+  submission: submissions/task1_gru_n2000_add6973_e1.npy

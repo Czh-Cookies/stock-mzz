@@ -76,6 +76,7 @@ class CSMLPModel:
         self.hard_repeat = int(cfg.get("hard_repeat", 1))
         self.hard_days: set[int] = set()
         self.aux_pred: np.ndarray | None = None
+        self.freeze_hidden = bool(cfg.get("freeze_hidden", False))
         self.net: CSMLPNet | None = None
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         self.ind_sel: np.ndarray | None = None
@@ -149,6 +150,15 @@ class CSMLPModel:
             y = neutralize_groups_1d(y, groups, mask)
         return y[idx]
 
+    def _apply_freeze_hidden(self) -> None:
+        if self.net is None:
+            raise RuntimeError("CS MLP net missing")
+        for name, p in self.net.named_parameters():
+            p.requires_grad = name.startswith("mlp.6.")
+        trainable = [n for n, p in self.net.named_parameters() if p.requires_grad]
+        frozen = [n for n, p in self.net.named_parameters() if not p.requires_grad]
+        print(f"freeze_hidden=True trainable={trainable} frozen={len(frozen)} tensors")
+
     def fit(
         self,
         data: dict[str, Any],
@@ -165,12 +175,18 @@ class CSMLPModel:
         if self.ind_sel is None:
             self.prepare_features(data)
 
-        self.net = self._build_net()
+        if self.net is None:
+            self.net = self._build_net()
+        if self.freeze_hidden:
+            self._apply_freeze_hidden()
         lr = float(self.cfg.get("lr", 1e-3))
         decay = float(self.cfg.get("weight_decay", 1e-4))
         epochs = int(self.cfg.get("max_epochs", 8))
         patience = int(self.cfg.get("patience", 3))
-        opt = torch.optim.Adam(self.net.parameters(), lr=lr, weight_decay=decay)
+        trainable = [p for p in self.net.parameters() if p.requires_grad]
+        if not trainable:
+            raise RuntimeError("no trainable CS MLP parameters")
+        opt = torch.optim.Adam(trainable, lr=lr, weight_decay=decay)
         rng = np.random.default_rng(self.seed)
         best_ic = -1e9
         best_state: dict[str, torch.Tensor] | None = None
@@ -180,7 +196,8 @@ class CSMLPModel:
         print(
             f"cs_mlp params={n_params} hidden={self.hidden_size} "
             f"loss={self.loss_name} target_mode={self.target_mode} "
-            f"hard_days={len(self.hard_days)} hard_repeat={self.hard_repeat}"
+            f"hard_days={len(self.hard_days)} hard_repeat={self.hard_repeat} "
+            f"freeze_hidden={self.freeze_hidden}"
         )
 
         base_days = list(range(int(train_start), int(train_end)))
@@ -314,3 +331,6 @@ class CSMLPModel:
         except TypeError:
             state = torch.load(path, map_location=self.device)
         self.net.load_state_dict(state)
+
+
+CSMLPModel = CSMLPModel

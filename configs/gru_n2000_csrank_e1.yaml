@@ -1,0 +1,13 @@
+# 创新：MSE 对齐 RankIC——当天 batch 内对 y1 做名次 z-score 再回归。特征仍是已上线 69+73。
+
+include: configs/gru_n2000_add6973_e1.yaml
+
+model:
+  max_epochs: 1
+  target_space: cs_rank
+
+paths:
+  checkpoint: checkpoints/gru_n2000_csrank_e1.pt
+  valid_pred: outputs/gru_n2000_csrank_e1_valid.npy
+  test_pred: outputs/gru_n2000_csrank_e1_test.npy
+  submission: submissions/task1_gru_n2000_csrank_e1.npy

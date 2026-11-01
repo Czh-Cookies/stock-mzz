@@ -1,0 +1,15 @@
+# 实验 freeze_gate_head_e2：加载 n2000 GRU，冻结 RNN 主干，只训 Linear 头，epoch=1。
+# include 基线 yaml，不修改该文件。不覆盖 n2000 checkpoint / task1_y1_upload.npy。
+
+include: configs/gru_no_today_recent_n2000.yaml
+
+model:
+  max_epochs: 1
+  freeze_backbone: true
+
+paths:
+  init_checkpoint: checkpoints/gru_no_today_recent_n2000.pt
+  checkpoint: checkpoints/gru_n2000_freeze_gate_head_e2.pt
+  valid_pred: outputs/gru_n2000_freeze_gate_head_e2_valid.npy
+  test_pred: outputs/gru_n2000_freeze_gate_head_e2_test.npy
+  submission: submissions/task1_gru_n2000_freeze_gate_head_e2.npy

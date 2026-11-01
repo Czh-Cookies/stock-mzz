@@ -1,0 +1,15 @@
+# 冠军 23 列 + n2000 + epoch=1，只打开当天一步。树已用当天截面，本刀看 69/73 轨迹是否还需要 t。
+
+include: configs/gru_n2000_add6973_e1.yaml
+
+features:
+  include_current_day: true
+
+model:
+  max_epochs: 1
+
+paths:
+  checkpoint: checkpoints/gru_n2000_with_today_e1.pt
+  valid_pred: outputs/gru_n2000_with_today_e1_valid.npy
+  test_pred: outputs/gru_n2000_with_today_e1_test.npy
+  submission: submissions/task1_gru_n2000_with_today_e1.npy

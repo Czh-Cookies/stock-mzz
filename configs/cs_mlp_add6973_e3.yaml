@@ -1,0 +1,18 @@
+# 相对已上线 cs_mlp，只把 GRU 有效的 69、73 补进行业 MLP。不改 cs_mlp.yaml，skip 权重搜索。
+
+include: configs/cs_mlp.yaml
+
+features:
+  num_indices: [5, 6, 7, 8, 10, 11, 17, 18, 19, 20, 21, 22, 24, 25, 39, 40, 41, 57, 68, 69, 70, 73, 90]
+
+model:
+  max_epochs: 3
+
+train:
+  skip_blend: true
+
+paths:
+  checkpoint: checkpoints/cs_mlp_add6973_e3.pt
+  valid_pred: outputs/cs_mlp_add6973_e3_valid.npy
+  test_pred: outputs/cs_mlp_add6973_e3_test.npy
+  submission: submissions/task1_cs_mlp_add6973_e3.npy

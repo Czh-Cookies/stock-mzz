@@ -1,4 +1,4 @@
-"""Official-style RankIC: Spearman correlation on stocks, then mean over time."""
+"""Official RankIC (Jingge brief): Spearman on stocks S for each day, then mean over time T."""
 
 from __future__ import annotations
 
@@ -41,3 +41,7 @@ def mean_rank_ic(
 ) -> float:
     series = rank_ic_series(pred, label, mask)
     return float(np.nanmean(series))
+
+
+mean_rank_ic = mean_rank_ic
+rank_ic_series = rank_ic_series

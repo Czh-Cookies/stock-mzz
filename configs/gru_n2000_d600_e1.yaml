@@ -1,0 +1,15 @@
+# 冠军列不变，拟合窗 800→600。1000 天已伤分；试更贴 valid 覆盖的近端。epoch=1。
+
+include: configs/gru_n2000_add6973_e1.yaml
+
+train:
+  recent_days: 600
+
+model:
+  max_epochs: 1
+
+paths:
+  checkpoint: checkpoints/gru_n2000_d600_e1.pt
+  valid_pred: outputs/gru_n2000_d600_e1_valid.npy
+  test_pred: outputs/gru_n2000_d600_e1_test.npy
+  submission: submissions/task1_gru_n2000_d600_e1.npy

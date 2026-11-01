@@ -1,0 +1,18 @@
+# 原 MLP 8 epoch，只多一个低基数 cat_2 embedding。skip 搜权。
+
+include: configs/cs_mlp.yaml
+
+features:
+  cat_indices: [1, 2]
+
+model:
+  max_epochs: 8
+
+train:
+  skip_blend: true
+
+paths:
+  checkpoint: checkpoints/cs_mlp_cat12_e8.pt
+  valid_pred: outputs/cs_mlp_cat12_e8_valid.npy
+  test_pred: outputs/cs_mlp_cat12_e8_test.npy
+  submission: submissions/task1_cs_mlp_cat12_e8.npy

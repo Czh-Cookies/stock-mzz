@@ -1,0 +1,37 @@
+# n2000 GRU + 全市场 seed42/43 浅融合，门控在 valid 上锁。不覆盖已过线提交。
+
+include: configs/default.yaml
+
+experiment_id: gru-ensemble-full-s43-001
+
+baseline:
+  documented_valid_rankic: 0.121023
+  n2000_valid_rankic: 0.117177
+  space: raw
+  mlp_space: rank
+
+inputs:
+  n2000_valid: outputs/gru_no_today_recent_n2000_valid.npy
+  n2000_test: outputs/gru_no_today_recent_n2000_test.npy
+  full_valid: outputs/gru_no_today_recent_full_valid.npy
+  full_test: outputs/gru_no_today_recent_full_test.npy
+  s43_valid: outputs/gru_no_today_recent_full_s43_valid.npy
+  s43_test: outputs/gru_no_today_recent_full_s43_test.npy
+  cross_section_valid: outputs/fusion_valid.npy
+  cross_section_test: outputs/fusion_test.npy
+  mlp_valid: outputs/cs_mlp_valid.npy
+  mlp_test: outputs/cs_mlp_test.npy
+
+search:
+  full_mix: [0.0, 0.35, 0.5, 0.65, 1.0]
+  s43_mix: [0.0, 0.3, 0.5, 0.7]
+  tau_qs: [0.65, 0.7, 0.75]
+  weight_lows: [0.15, 0.2, 0.25]
+  weight_highs: [0.55, 0.6, 0.7]
+  mlp_weights: [0.05, 0.1, 0.15]
+
+paths:
+  valid_pred: outputs/fusion_gru_ensemble_valid.npy
+  test_pred: outputs/fusion_gru_ensemble_test.npy
+  submission: submissions/task1_fusion_gru_ensemble.npy
+  lock: outputs/fusion_gru_ensemble_lock.json

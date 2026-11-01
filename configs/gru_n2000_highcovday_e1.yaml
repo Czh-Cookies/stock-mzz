@@ -1,0 +1,16 @@
+# 相对已上线 69+73 GRU：训练日只保留 mask_x 数 ≥ train 末800天 60分位(3761)。
+# 与覆盖度门控同一因果，不看 valid。不改基线 yaml。
+
+include: configs/gru_n2000_add6973_e1.yaml
+
+features:
+  min_day_n_x: 3761
+
+model:
+  max_epochs: 1
+
+paths:
+  checkpoint: checkpoints/gru_n2000_highcovday_e1.pt
+  valid_pred: outputs/gru_n2000_highcovday_e1_valid.npy
+  test_pred: outputs/gru_n2000_highcovday_e1_test.npy
+  submission: submissions/task1_gru_n2000_highcovday_e1.npy

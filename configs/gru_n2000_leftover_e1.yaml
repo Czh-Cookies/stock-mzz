@@ -1,0 +1,16 @@
+# 独立 leftover 小 GRU：只用冠军主 GRU 未用的轨迹列。
+# 不改 hidden、不加第二层、epoch=1。不覆盖 gru_n2000_add6973_e1。
+
+include: configs/gru_no_today_recent_n2000.yaml
+
+features:
+  num_indices: [3, 47, 48, 49, 76, 86]
+
+model:
+  max_epochs: 1
+
+paths:
+  checkpoint: checkpoints/gru_n2000_leftover_e1.pt
+  valid_pred: outputs/gru_n2000_leftover_e1_valid.npy
+  test_pred: outputs/gru_n2000_leftover_e1_test.npy
+  submission: submissions/task1_gru_n2000_leftover_e1.npy

@@ -1,0 +1,20 @@
+# 方向2纠正：加载已收敛 cs_mlp，冻结隐藏层与 embedding，只训最后线性层。
+# GRU / 树主干不参与更新。不修改 cs_mlp.yaml，不覆盖 cs_mlp.pt / task1_y1_upload.npy。
+
+include: configs/cs_mlp.yaml
+
+model:
+  max_epochs: 1
+  freeze_hidden: true
+  lr: 0.0003
+
+train:
+  recent_days: 800
+  skip_blend: true
+
+paths:
+  init_checkpoint: checkpoints/cs_mlp.pt
+  checkpoint: checkpoints/cs_mlp_freeze_head_e1.pt
+  valid_pred: outputs/cs_mlp_freeze_head_e1_valid.npy
+  test_pred: outputs/cs_mlp_freeze_head_e1_test.npy
+  submission: submissions/task1_cs_mlp_freeze_head_e1.npy

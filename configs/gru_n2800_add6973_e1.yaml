@@ -1,0 +1,15 @@
+# 漏洞：2000 只偏小、全市场融合又变差。夹在中间每天 2800 只，特征仍是已上线 69+73。
+
+include: configs/gru_n2000_add6973_e1.yaml
+
+features:
+  max_train_stocks_per_day: 2800
+
+model:
+  max_epochs: 1
+
+paths:
+  checkpoint: checkpoints/gru_n2800_add6973_e1.pt
+  valid_pred: outputs/gru_n2800_add6973_e1_valid.npy
+  test_pred: outputs/gru_n2800_add6973_e1_test.npy
+  submission: submissions/task1_gru_n2800_add6973_e1.npy

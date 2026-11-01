@@ -1,0 +1,14 @@
+# 冠军 23 列、L=10、epoch=1，只把 GRU 叠成 2 层（dropout 0.1 才会生效）。
+
+include: configs/gru_n2000_add6973_e1.yaml
+
+model:
+  max_epochs: 1
+  num_layers: 2
+  dropout: 0.1
+
+paths:
+  checkpoint: checkpoints/gru_n2000_l2_e1.pt
+  valid_pred: outputs/gru_n2000_l2_e1_valid.npy
+  test_pred: outputs/gru_n2000_l2_e1_test.npy
+  submission: submissions/task1_gru_n2000_l2_e1.npy

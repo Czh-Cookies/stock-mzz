@@ -1,0 +1,18 @@
+# 实验记录：train 拟合塌缩日开关。不覆盖冠军 yaml / 门控脚本。
+# 推理：n_x >= tau_n（train 锁死）则 GRU 权重用 w_collapse；否则原保守门 0.25/0.4。
+
+experiment_id: collapse_train_switch_e1
+leftover_weight: null
+collapse:
+  fit_split: train_last_800
+  observable: n_x
+  margin_sigma: 0.5
+  leftover_cols: []
+
+paths:
+  lock: outputs/collapse_train_switch_locked.json
+  gru_train: outputs/gru_n2000_add6973_e1_train.npy
+  tree_train: outputs/tree_blend07_train800.npy
+  valid_pred: outputs/fusion_collapse_train_switch_e1_valid.npy
+  test_pred: outputs/fusion_collapse_train_switch_e1_test.npy
+  submission: submissions/task1_fusion_collapse_train_switch_e1.npy

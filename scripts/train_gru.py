@@ -61,7 +61,11 @@ def main() -> None:
         f"GRU L={feat.get('length')} include_t={feat.get('include_current_day', True)} "
         f"cols={len(feat.get('num_indices') or [])} hidden={model_cfg.get('hidden_size')} "
         f"max_train_stocks={feat.get('max_train_stocks_per_day')} "
-        f"loss={model_cfg.get('loss', 'mse')} cats={feat.get('cat_indices') or '-'}"
+        f"sample_mode={feat.get('sample_mode') or 'uniform'} "
+        f"min_history_coverage={feat.get('min_history_coverage') or 0} "
+        f"freeze_backbone={model_cfg.get('freeze_backbone', False)} "
+        f"loss={model_cfg.get('loss', 'mse')} loss_weight={model_cfg.get('loss_weight') or feat.get('loss_weight') or 'none'} "
+        f"clip={feat.get('clip')} drop_corr={feat.get('drop_corr_threshold') or 0} cats={feat.get('cat_indices') or '-'}"
     )
 
     data_path = resolve_data_path(cfg, args.data)
@@ -84,6 +88,16 @@ def main() -> None:
     model = GRUModel(gru_cfg, seed=seed)
     t1 = time.perf_counter()
     model.prepare_features(data)
+    init_ckpt = paths.get("init_checkpoint")
+    if init_ckpt:
+        init_path = ROOT / str(init_ckpt)
+        if not init_path.is_file():
+            raise SystemExit(f"missing init_checkpoint {init_path}")
+        model.load(init_path)
+        model.cfg = {**model.cfg, **gru_cfg}
+        model.freeze_backbone = bool(gru_cfg.get("freeze_backbone", False))
+        model.max_train_stocks = gru_cfg.get("max_train_stocks_per_day")
+        print(f"loaded init_checkpoint={init_path}")
     _drop_heavy_panels(data, valid, test)
     print(f"cs cache {time.perf_counter() - t1:.1f}s; dropped num_x/cat_x")
 

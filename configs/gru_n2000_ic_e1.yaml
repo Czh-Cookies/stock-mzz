@@ -1,0 +1,13 @@
+# n2000 配方只改损失为 Pearson IC，epoch=1。不修改基线 yaml。
+
+include: configs/gru_no_today_recent_n2000.yaml
+
+model:
+  max_epochs: 1
+  loss: pearson_ic
+
+paths:
+  checkpoint: checkpoints/gru_n2000_ic_e1.pt
+  valid_pred: outputs/gru_n2000_ic_e1_valid.npy
+  test_pred: outputs/gru_n2000_ic_e1_test.npy
+  submission: submissions/task1_gru_n2000_ic_e1.npy

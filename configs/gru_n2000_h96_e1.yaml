@@ -1,0 +1,13 @@
+# 23 维特征仍用 hidden=64，容量偏紧。只把 hidden 提到 96，其余与已上线 69+73 相同。
+
+include: configs/gru_n2000_add6973_e1.yaml
+
+model:
+  max_epochs: 1
+  hidden_size: 96
+
+paths:
+  checkpoint: checkpoints/gru_n2000_h96_e1.pt
+  valid_pred: outputs/gru_n2000_h96_e1_valid.npy
+  test_pred: outputs/gru_n2000_h96_e1_test.npy
+  submission: submissions/task1_gru_n2000_h96_e1.npy

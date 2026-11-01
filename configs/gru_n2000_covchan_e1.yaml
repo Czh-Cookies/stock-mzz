@@ -1,0 +1,17 @@
+# 创新：在已上线 69+73 特征上，给 GRU 加上市标记 + 窗口内市场宽度。
+# 缺测不再和 z-score=0 混在一起；宽度与覆盖度门控同一因果信息。不改基线 yaml。
+
+include: configs/gru_n2000_add6973_e1.yaml
+
+features:
+  append_mask_channel: true
+  append_breadth_channel: true
+
+model:
+  max_epochs: 1
+
+paths:
+  checkpoint: checkpoints/gru_n2000_covchan_e1.pt
+  valid_pred: outputs/gru_n2000_covchan_e1_valid.npy
+  test_pred: outputs/gru_n2000_covchan_e1_test.npy
+  submission: submissions/task1_gru_n2000_covchan_e1.npy

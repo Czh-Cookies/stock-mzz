@@ -1,0 +1,16 @@
+# 方向3剩余：只在 train 末 800 天上按 |corr|>=0.85 丢掉冗余列。clip 仍 ±5，无覆盖加权。
+# include 基线 yaml，不修改该文件。不覆盖 n2000 checkpoint / task1_y1_upload.npy。
+
+include: configs/gru_no_today_recent_n2000.yaml
+
+features:
+  drop_corr_threshold: 0.85
+
+model:
+  max_epochs: 1
+
+paths:
+  checkpoint: checkpoints/gru_n2000_dropcorr_e1.pt
+  valid_pred: outputs/gru_n2000_dropcorr_e1_valid.npy
+  test_pred: outputs/gru_n2000_dropcorr_e1_test.npy
+  submission: submissions/task1_gru_n2000_dropcorr_e1.npy

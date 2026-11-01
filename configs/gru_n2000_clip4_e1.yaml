@@ -1,0 +1,15 @@
+# 相对已上线 69+73：CS clip 5→4，其余不变。失败回滚。
+
+include: configs/gru_n2000_add6973_e1.yaml
+
+features:
+  clip: 4.0
+
+model:
+  max_epochs: 1
+
+paths:
+  checkpoint: checkpoints/gru_n2000_clip4_e1.pt
+  valid_pred: outputs/gru_n2000_clip4_e1_valid.npy
+  test_pred: outputs/gru_n2000_clip4_e1_test.npy
+  submission: submissions/task1_gru_n2000_clip4_e1.npy

@@ -174,3 +174,6 @@ def numeric_block_count_safe(feature_cfg: dict[str, Any]) -> int:
     from src.dataset import numeric_block_count
 
     return numeric_block_count(feature_cfg)
+
+
+LightGBMBaseline = LightGBMBaseline

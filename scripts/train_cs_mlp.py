@@ -97,6 +97,16 @@ def main() -> None:
     model = CSMLPModel(mlp_cfg, seed=seed)
     t1 = time.perf_counter()
     model.prepare_features(data)
+    init_ckpt = paths.get("init_checkpoint")
+    if init_ckpt:
+        init_path = ROOT / str(init_ckpt)
+        if not init_path.is_file():
+            raise SystemExit(f"missing init_checkpoint {init_path}")
+        model.load(init_path)
+        model.cfg = {**model.cfg, **mlp_cfg}
+        model.freeze_hidden = bool(mlp_cfg.get("freeze_hidden", False))
+        model.max_train_stocks = mlp_cfg.get("max_train_stocks_per_day")
+        print(f"loaded init_checkpoint={init_path}")
     _drop_heavy_panels(data, valid, test)
     print(f"ind cache {time.perf_counter() - t1:.1f}s; dropped num_x/cat_x")
 
@@ -141,7 +151,13 @@ def main() -> None:
     print(f"wrote {checkpoint}")
     print(f"wrote {valid_pred_path}")
     print(f"wrote {submission}")
-    print("does not overwrite submissions/task1_fusion_gru_blend.npy")
+    print(f"does not overwrite submissions/task1_fusion_gru_blend.npy")
+
+    if bool(train_cfg.get("skip_blend")):
+        print("skip_blend=True; not searching fusion weights")
+        print(f"total {time.perf_counter() - t0:.1f}s")
+        print("VALID_RANKIC", f"{valid_ic:.6f}")
+        return
 
     blend_path = ROOT / "outputs/fusion_gru_blend_valid.npy"
     blend_test_path = ROOT / "outputs/fusion_gru_blend_test.npy"

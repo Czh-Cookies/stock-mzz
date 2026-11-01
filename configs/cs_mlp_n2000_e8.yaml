@@ -1,0 +1,18 @@
+# 原 MLP 特征与 8 epoch，只把每天训练股票 800→2000（对齐 GRU 的 n2000 教训）。skip 搜权。
+
+include: configs/cs_mlp.yaml
+
+features:
+  max_train_stocks_per_day: 2000
+
+model:
+  max_epochs: 8
+
+train:
+  skip_blend: true
+
+paths:
+  checkpoint: checkpoints/cs_mlp_n2000_e8.pt
+  valid_pred: outputs/cs_mlp_n2000_e8_valid.npy
+  test_pred: outputs/cs_mlp_n2000_e8_test.npy
+  submission: submissions/task1_cs_mlp_n2000_e8.npy

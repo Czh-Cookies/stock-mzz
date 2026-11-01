@@ -1,0 +1,15 @@
+# 冠军列不变，拟合窗 800→1000 天。epoch=1。不改 n2000 基线 yaml。
+
+include: configs/gru_n2000_add6973_e1.yaml
+
+train:
+  recent_days: 1000
+
+model:
+  max_epochs: 1
+
+paths:
+  checkpoint: checkpoints/gru_n2000_d1000_e1.pt
+  valid_pred: outputs/gru_n2000_d1000_e1_valid.npy
+  test_pred: outputs/gru_n2000_d1000_e1_test.npy
+  submission: submissions/task1_gru_n2000_d1000_e1.npy

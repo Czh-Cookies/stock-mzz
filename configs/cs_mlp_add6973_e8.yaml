@@ -1,0 +1,18 @@
+# 教训：69+73 进 MLP 只训 3 epoch 欠拟合。按原 cs_mlp 的 8 epoch 再训。skip 搜权。
+
+include: configs/cs_mlp.yaml
+
+features:
+  num_indices: [5, 6, 7, 8, 10, 11, 17, 18, 19, 20, 21, 22, 24, 25, 39, 40, 41, 57, 68, 69, 70, 73, 90]
+
+model:
+  max_epochs: 8
+
+train:
+  skip_blend: true
+
+paths:
+  checkpoint: checkpoints/cs_mlp_add6973_e8.pt
+  valid_pred: outputs/cs_mlp_add6973_e8_valid.npy
+  test_pred: outputs/cs_mlp_add6973_e8_test.npy
+  submission: submissions/task1_cs_mlp_add6973_e8.npy

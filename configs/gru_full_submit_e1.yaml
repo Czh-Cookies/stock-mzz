@@ -1,0 +1,5 @@
+# 全市场 GRU 只训 1 个 epoch（n2000 也是 epoch 1 最佳后崩）。不改 n2000 yaml。
+include: configs/gru_no_today_recent_full.yaml
+
+model:
+  max_epochs: 1

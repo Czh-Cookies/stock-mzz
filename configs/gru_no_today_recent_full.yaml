@@ -1,0 +1,13 @@
+# 相对 gru_no_today_recent：每天训练股票改为当日全部有标签的票（约 3500–4200）。
+# 仍是末 800 天、不含当天、MSE。不覆盖 n2000 checkpoint / npy。
+
+include: configs/gru_no_today_recent.yaml
+
+features:
+  max_train_stocks_per_day: null
+
+paths:
+  checkpoint: checkpoints/gru_no_today_recent_full.pt
+  valid_pred: outputs/gru_no_today_recent_full_valid.npy
+  test_pred: outputs/gru_no_today_recent_full_test.npy
+  submission: submissions/task1_gru_no_today_recent_full.npy

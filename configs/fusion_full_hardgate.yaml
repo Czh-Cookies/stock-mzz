@@ -1,0 +1,37 @@
+# 冻结树融合 + 原 cs_mlp，只换全市场 GRU，再在 valid 上微调覆盖度门控。
+# 不覆盖 n2000 产物。测试集不参与搜参。
+
+include: configs/default.yaml
+
+experiment_id: gru-no-today-recent-full-001
+
+baseline:
+  documented_valid_rankic: 0.117177
+  space: raw
+  tau_q: 0.6
+  weight_low: 0.25
+  weight_high: 0.4
+  mlp_space: rank
+  mlp_weight: 0.15
+
+inputs:
+  temporal_valid: outputs/gru_no_today_recent_full_valid.npy
+  temporal_test: outputs/gru_no_today_recent_full_test.npy
+  ref_temporal_valid: outputs/gru_no_today_recent_n2000_valid.npy
+  ref_temporal_test: outputs/gru_no_today_recent_n2000_test.npy
+  cross_section_valid: outputs/fusion_valid.npy
+  cross_section_test: outputs/fusion_test.npy
+  mlp_valid: outputs/cs_mlp_valid.npy
+  mlp_test: outputs/cs_mlp_test.npy
+
+search:
+  tau_qs: [0.5, 0.6, 0.7]
+  weight_lows: [0.2, 0.25, 0.3]
+  weight_highs: [0.4, 0.5, 0.6]
+  mlp_weights: [0.1, 0.15, 0.2]
+
+paths:
+  valid_pred: outputs/fusion_full_hardgate_valid.npy
+  test_pred: outputs/fusion_full_hardgate_test.npy
+  submission: submissions/task1_fusion_full_hardgate.npy
+  lock: outputs/fusion_full_hardgate_lock.json

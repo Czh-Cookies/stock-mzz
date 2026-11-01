@@ -1,0 +1,15 @@
+# 当天 batch 内对 GRU 末隐状态做截面 z-score，再与原隐状态拼接。
+# 让单票 GRU 看见「这一天别人怎么样」。特征仍是已上线 69/73。epoch=1。
+# 不改 gru_n2000_add6973_e1.yaml，不覆盖冠军产物。
+
+include: configs/gru_n2000_add6973_e1.yaml
+
+model:
+  max_epochs: 1
+  cs_hidden_norm: true
+
+paths:
+  checkpoint: checkpoints/gru_n2000_cshidden_e1.pt
+  valid_pred: outputs/gru_n2000_cshidden_e1_valid.npy
+  test_pred: outputs/gru_n2000_cshidden_e1_test.npy
+  submission: submissions/task1_gru_n2000_cshidden_e1.npy

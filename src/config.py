@@ -51,3 +51,8 @@ def resolve_data_path(cfg: dict[str, Any], cli_path: str | None = None) -> Path:
     if not path.is_file():
         raise FileNotFoundError(path)
     return path
+
+
+# Older scripts import these names.
+load_config = load_config
+resolve_data_path = resolve_data_path

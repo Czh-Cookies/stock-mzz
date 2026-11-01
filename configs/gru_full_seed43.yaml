@@ -1,0 +1,10 @@
+# 全市场 GRU，种子 43。不覆盖 seed 42 / n2000 产物。
+include: configs/gru_full_submit_e1.yaml
+
+seed: 43
+
+paths:
+  checkpoint: checkpoints/gru_no_today_recent_full_s43.pt
+  valid_pred: outputs/gru_no_today_recent_full_s43_valid.npy
+  test_pred: outputs/gru_no_today_recent_full_s43_test.npy
+  submission: submissions/task1_gru_no_today_recent_full_s43.npy

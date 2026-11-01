@@ -1,0 +1,5 @@
+# Submission-only: stop after epoch 1 (documented best for n2000). Does not change gru_no_today_recent_n2000.yaml.
+include: configs/gru_no_today_recent_n2000.yaml
+
+model:
+  max_epochs: 1
