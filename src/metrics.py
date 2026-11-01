@@ -24,6 +24,13 @@ def rank_ic_series(
     """pred/label: (T, S). mask True means the point is valid."""
     if pred.shape != label.shape:
         raise ValueError(f"shape mismatch: pred {pred.shape} vs label {label.shape}")
+    if pred.ndim != 2:
+        raise ValueError("RankIC expects 2-D panels")
+    if mask is not None and mask.shape != pred.shape:
+        raise ValueError("mask shape mismatch")
+    selected = np.ones(pred.shape, dtype=bool) if mask is None else mask.astype(bool)
+    if np.any(selected & (~np.isfinite(pred) | ~np.isfinite(label))):
+        raise ValueError("NaN/Inf in prediction or label at valid label positions")
     t_len, _ = pred.shape
     out = np.full(t_len, np.nan, dtype=np.float64)
     for t in range(t_len):

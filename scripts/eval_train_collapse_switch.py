@@ -36,6 +36,7 @@ from src.dataset import (  # noqa: E402
     slice_split,
     split_cache_dir,
 )
+from src.provenance import CacheValidationError, array_sha256, canonical, file_sha256
 from src.metrics import mean_rank_ic, rank_ic_series  # noqa: E402
 from src.models.baseline import LightGBMBaseline  # noqa: E402
 from src.models.fusion import linear_blend, stack_mlp_blend  # noqa: E402
@@ -46,10 +47,10 @@ CHAMP_GRU_CFG = ROOT / "configs/gru_n2000_add6973_e1.yaml"
 CHAMP_GRU_CKPT = ROOT / "checkpoints/gru_n2000_add6973_e1.pt"
 CHAMP_GRU_VALID = ROOT / "outputs/gru_n2000_add6973_e1_valid.npy"
 CHAMP_GRU_TEST = ROOT / "outputs/gru_n2000_add6973_e1_test.npy"
-GRU_TRAIN = ROOT / "outputs/gru_n2000_add6973_e1_train.npy"
-TREE_TRAIN = ROOT / "outputs/tree_blend07_train800.npy"
-STATS_TRAIN = ROOT / "outputs/collapse_train_day_stats.npz"
-LOCK_PATH = ROOT / "outputs/collapse_train_switch_locked.json"
+GRU_TRAIN = ROOT / "outputs/gru_n2000_add6973_e1_train_r0.npy"
+TREE_TRAIN = ROOT / "outputs/tree_blend07_train800_r0.npy"
+STATS_TRAIN = ROOT / "outputs/collapse_train_day_stats_r0.npz"
+LOCK_PATH = ROOT / "outputs/collapse_train_switch_locked_r0.json"
 
 W_LOW = 0.25
 W_HIGH = 0.4
@@ -59,14 +60,29 @@ TREE_BLEND = 0.7
 RECENT_DAYS = 800
 MARGIN_SIGMA = 0.5
 LOCAL_FUSED_BASE = 0.11840
-TAG = "collapse_train_switch_e1"
+TAG = "collapse_train_switch_r0"
 
 
 def _relu(x: np.ndarray) -> np.ndarray:
     return np.maximum(np.asarray(x, dtype=np.float64), 0.0)
 
 
+def _stats_contract():
+    cfg = load_config(CHAMP_GRU_CFG)
+    deps = [CHAMP_GRU_CKPT, CHAMP_GRU_CKPT.with_suffix(".pt.meta.json"),
+            ROOT / "checkpoints/hist_lgbm.txt", ROOT / "checkpoints/hist_lgbm.txt.meta.json",
+            ROOT / "checkpoints/baseline.txt", ROOT / "checkpoints/baseline.txt.meta.json",
+            Path(__file__), ROOT / "src/models/gru_ts.py", ROOT / "src/dataset.py",
+            ROOT / "src/metrics.py", ROOT / "src/models/baseline.py", ROOT / "src/models/fusion.py"]
+    return {"source": file_sha256(resolve_data_path(cfg)), "config": cfg,
+            "recent_days": RECENT_DAYS, "tree_blend": TREE_BLEND,
+            "dependencies": {str(p.relative_to(ROOT)): file_sha256(p) for p in deps}}
+
+
 def _predict_train_branches() -> None:
+    contract = _stats_contract()
+    if any(p.exists() for p in (GRU_TRAIN, TREE_TRAIN, STATS_TRAIN)):
+        raise CacheValidationError("R0 stats outputs exist; refuse to overwrite")
     cfg = load_config(CHAMP_GRU_CFG)
     data_path = resolve_data_path(cfg)
     print(f"load panel for train preds data={data_path}", flush=True)
@@ -82,8 +98,8 @@ def _predict_train_branches() -> None:
     train_cfg = dict(cfg.get("train") or {})
     gru_cfg = {**feat, **model_cfg, **train_cfg}
     gru = GRUModel(gru_cfg, seed=int(cfg.get("seed", 42)))
-    gru.prepare_features(data)
     gru.load(CHAMP_GRU_CKPT)
+    gru.prepare_features(data)
     t1 = time.perf_counter()
     gru_pred = gru.predict_panel(train, data, fill_invalid=0.0)
     print(f"GRU train predict {time.perf_counter() - t1:.1f}s {gru_pred.shape}", flush=True)
@@ -123,12 +139,16 @@ def _predict_train_branches() -> None:
     n_x = np.asarray(train["mask_x"]).sum(axis=1).astype(np.float64)
     gru_ic = rank_ic_series(gru_pred, train["y1"], train["mask_y"])
     tree_ic = rank_ic_series(tree_pred, train["y1"], train["mask_y"])
+    contract["payload_hashes"] = {k: array_sha256(v) for k, v in
+        {"n_x": n_x, "gru_ic": gru_ic, "tree_ic": tree_ic,
+         "start": np.int32(train["start"])}.items()}
     np.savez(
         STATS_TRAIN,
         n_x=n_x,
         gru_ic=gru_ic,
         tree_ic=tree_ic,
         start=np.int32(train["start"]),
+        manifest=np.array(canonical(contract)),
     )
     print(f"wrote {GRU_TRAIN}")
     print(f"wrote {TREE_TRAIN}")
@@ -139,7 +159,16 @@ def _predict_train_branches() -> None:
 
 
 def _fit_lock() -> dict:
-    stats = np.load(STATS_TRAIN)
+    with np.load(STATS_TRAIN, allow_pickle=False) as cached:
+        if "manifest" not in cached.files:
+            raise CacheValidationError("unverified collapse stats; regenerate into R0 paths")
+        metadata = json.loads(str(cached["manifest"]))
+        hashes = metadata.pop("payload_hashes", {})
+        if canonical(metadata) != canonical(_stats_contract()):
+            raise CacheValidationError("collapse stats source/config/checkpoint mismatch")
+        stats = {k: cached[k] for k in ("n_x", "gru_ic", "tree_ic", "start")}
+        if hashes != {k: array_sha256(v) for k, v in stats.items()}:
+            raise CacheValidationError("collapse stats payload mismatch")
     n_x = np.asarray(stats["n_x"], dtype=np.float64)
     gru_ic = np.asarray(stats["gru_ic"], dtype=np.float64)
     tree_ic = np.asarray(stats["tree_ic"], dtype=np.float64)
@@ -226,7 +255,9 @@ def main() -> None:
 
     if not CHAMP_GRU_CKPT.is_file():
         raise SystemExit(f"missing champion GRU {CHAMP_GRU_CKPT}")
-    if not args.skip_predict or not (GRU_TRAIN.is_file() and TREE_TRAIN.is_file() and STATS_TRAIN.is_file()):
+    if args.skip_predict and not STATS_TRAIN.is_file():
+        raise CacheValidationError("verified R0 stats missing; --skip-predict cannot reuse legacy stats")
+    if not args.skip_predict:
         _predict_train_branches()
     lock = _fit_lock()
 

@@ -11,6 +11,7 @@ import numpy as np
 import torch
 from torch import nn
 
+from src.provenance import file_sha256
 from src.dataset import gather_windows, history_coverage_fraction, precompute_cs_cols, select_gru_train_idx
 
 
@@ -111,8 +112,27 @@ class GRUModel:
         self.cat_cardinalities: list[int] = []
         self.industry_panel: np.ndarray | None = None
         self.day_breadth: np.ndarray | None = None
+        self._prepared_spec = None
+        self._loaded_checkpoint = False
+        self._feature_axes = None
+
+    def feature_spec(self) -> dict:
+        return {"cols": list(self.cols), "cat_indices": list(self.cat_indices),
+                "clip": self.clip, "length": self.length, "include_current": self.include_current,
+                "append_mask_channel": self.append_mask_channel,
+                "append_breadth_channel": self.append_breadth_channel,
+                "industry_col": self.industry_col, "normalization": "daily_cs_zscore_v1"}
+
+    def _check_features(self) -> None:
+        if self._prepared_spec != self.feature_spec():
+            raise ValueError("feature order/config changed; rebuild features with prepare_features")
 
     def prepare_features(self, data: dict[str, Any]) -> None:
+        axes = {key: [str(v) for v in data.get(key, range(data[array].shape[2]))]
+                for key, array in (("num_feature_ids", "num_x"), ("cat_feature_ids", "cat_x"))}
+        if self._feature_axes is not None and axes != self._feature_axes:
+            raise ValueError("input feature axis order differs from checkpoint/prepared features")
+        self._feature_axes = axes
         print(f"precompute CS z-score cols={self.cols} T={data['num_x'].shape[0]}")
         self.cs_sel = precompute_cs_cols(data["num_x"], data["mask_x"], self.cols)
         if self.clip is not None:
@@ -122,7 +142,8 @@ class GRUModel:
         if self.cat_indices:
             self.cat_sel = np.asarray(data["cat_x"][..., self.cat_indices], dtype=np.int32)
             maxes = self.cat_sel.max(axis=(0, 1))
-            self.cat_cardinalities = [int(m) + 1 for m in np.asarray(maxes).ravel()]
+            if not self._loaded_checkpoint:
+                self.cat_cardinalities = [int(m) + 1 for m in np.asarray(maxes).ravel()]
             print(f"cat_indices={self.cat_indices} cardinalities={self.cat_cardinalities}")
         else:
             self.cat_sel = None
@@ -132,6 +153,8 @@ class GRUModel:
             print(f"industry_col={self.industry_col} for train sampling")
         else:
             self.industry_panel = None
+
+        self._prepared_spec = self.feature_spec()
 
     def _build_net(self) -> GRUNet:
         dropout = self.dropout if self.num_layers > 1 else 0.0
@@ -283,7 +306,10 @@ class GRUModel:
         np.random.seed(self.seed)
         if self.cs_sel is None:
             self.prepare_features(data)
-        self._drop_high_corr_train(data, train_start, train_end)
+        self._check_features()
+        if not self._loaded_checkpoint:
+            self._drop_high_corr_train(data, train_start, train_end)
+            self._prepared_spec = self.feature_spec()
 
         if self.net is None:
             self.net = self._build_net()
@@ -416,6 +442,7 @@ class GRUModel:
             if full_data is None:
                 raise RuntimeError("call prepare_features first")
             self.prepare_features(full_data)
+        self._check_features()
         self.net.eval()
         mask_panel = self._mask_panel(split_data, full_data)
         start = int(split_data.get("start", 0))
@@ -448,6 +475,10 @@ class GRUModel:
         path.parent.mkdir(parents=True, exist_ok=True)
         torch.save(self.net.state_dict(), path)
         meta = {
+            "format_version": 2,
+            "weights_sha256": file_sha256(path),
+            "feature_axes": self._feature_axes,
+            "feature_spec": self.feature_spec(),
             "cfg": self.cfg,
             "seed": self.seed,
             "cols": self.cols,
@@ -470,32 +501,50 @@ class GRUModel:
             encoding="utf-8",
         )
 
-    def load(self, path: str | Path) -> None:
+    def load(self, path: str | Path, *, training_overrides: dict | None = None) -> None:
+        """Restore architecture before features. Legacy metadata must contain cfg/cols.
+
+        This is weight initialization, not optimizer-state resumption. Only explicit
+        training controls can override the checkpoint; feature overrides are rejected.
+        """
         path = Path(path)
         meta_path = path.with_suffix(path.suffix + ".meta.json")
-        if meta_path.is_file():
-            meta = json.loads(meta_path.read_text(encoding="utf-8"))
-            self.cfg = meta.get("cfg", self.cfg)
-            self.seed = int(meta.get("seed", self.seed))
-            self.cols = [int(i) for i in meta.get("cols", self.cols)]
-            self.length = int(meta.get("length", self.length))
-            self.include_current = bool(meta.get("include_current", self.include_current))
-            self.hidden_size = int(meta.get("hidden_size", self.hidden_size))
-            self.num_layers = int(meta.get("num_layers", self.num_layers))
-            self.dropout = float(meta.get("dropout", self.dropout))
-            self.clip = meta.get("clip", self.clip)
-            self.cat_indices = [int(i) for i in meta.get("cat_indices", self.cfg.get("cat_indices") or [])]
-            self.cat_embed_dim = int(meta.get("cat_embed_dim", self.cfg.get("cat_embed_dim", 8)))
-            self.cat_cardinalities = [int(c) for c in (meta.get("cat_cardinalities") or [])]
-            self.loss_name = str(meta.get("loss", self.cfg.get("loss", "mse"))).lower()
-            self.window_jitter = float(meta.get("window_jitter", self.cfg.get("window_jitter", 0.0)) or 0.0)
-            self.cs_hidden_norm = bool(meta.get("cs_hidden_norm", self.cfg.get("cs_hidden_norm", False)))
-        self.net = self._build_net()
-        try:
-            state = torch.load(path, map_location=self.device, weights_only=True)
-        except TypeError:
-            state = torch.load(path, map_location=self.device)
-        self.net.load_state_dict(state)
+        if not meta_path.is_file():
+            raise ValueError("checkpoint metadata missing; cannot prove feature identity")
+        meta = json.loads(meta_path.read_text(encoding="utf-8"))
+        if "cfg" not in meta or not meta.get("cols"):
+            raise ValueError("checkpoint lacks full configuration/ordered feature columns")
+        if "weights_sha256" in meta and file_sha256(path) != meta["weights_sha256"]:
+            raise ValueError("checkpoint weights/metadata hash mismatch")
+        cfg = dict(meta["cfg"])
+        aliases = {"cols": "num_indices", "include_current": "include_current_day"}
+        for key in ("cols", "length", "include_current", "hidden_size", "num_layers", "dropout",
+                    "clip", "cat_indices", "cat_embed_dim", "loss", "window_jitter",
+                    "rank_loss_weight", "cs_hidden_norm"):
+            if key in meta:
+                cfg[aliases.get(key, key)] = meta[key]
+        allowed = {"lr", "weight_decay", "max_epochs", "patience", "freeze_backbone",
+                   "max_train_stocks_per_day", "min_train_stocks", "sample_mode",
+                   "min_history_coverage", "min_day_n_x", "log_every_days", "window_jitter",
+                   "loss", "loss_weight", "rank_loss_weight", "target_space"}
+        overrides = training_overrides or {}
+        if set(overrides) - allowed:
+            raise ValueError(f"not a training override: {sorted(set(overrides) - allowed)}")
+        cfg.update(overrides)
+        restored = GRUModel(cfg, seed=int(meta.get("seed", 42)))
+        restored.device = self.device
+        restored._feature_axes = meta.get("feature_axes")
+        restored.cat_cardinalities = [int(c) for c in meta.get("cat_cardinalities", [])]
+        if len(restored.cat_cardinalities) != len(restored.cat_indices):
+            raise ValueError("checkpoint category cardinalities missing/inconsistent")
+        if "feature_spec" in meta and meta["feature_spec"] != restored.feature_spec():
+            raise ValueError("checkpoint feature specification mismatch")
+        restored.net = restored._build_net()
+        state = torch.load(path, map_location=self.device, weights_only=True)
+        restored.net.load_state_dict(state)
+        restored._loaded_checkpoint = True
+        # Discard all prepared arrays, including those made before load().
+        self.__dict__.update(restored.__dict__)
 
 
 GRUModel = GRUModel

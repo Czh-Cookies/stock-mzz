@@ -19,6 +19,7 @@ from src.dataset import (  # noqa: E402
     drop_task2_label,
     dump_split_cache,
     load_panel,
+    load_eval_splits,
     split_cache_dir,
 )
 
@@ -29,19 +30,24 @@ def main() -> None:
     parser.add_argument("--data", default=None)
     parser.add_argument("--force", action="store_true")
     parser.add_argument("--industry-col", type=int, default=6)
+    parser.add_argument("--dest", default=None, help="new cache directory; preserve historical artifacts")
     args = parser.parse_args()
 
-    dest = split_cache_dir(ROOT)
+    cfg = load_config(args.config)
+    data_path = resolve_data_path(cfg, args.data)
+    dest = Path(args.dest) if args.dest else split_cache_dir(ROOT)
     names = ("train", "valid", "test")
     if not args.force and all((dest / f"{name}.npz").is_file() for name in names):
-        print(f"cache already at {dest} (pass --force to rebuild)")
+        load_eval_splits(cache_dir=dest, data_path=data_path, splits=names,
+                         industry_col=args.industry_col, dump_if_missing=False)
+        print(f"verified cache at {dest}")
         for name in names:
             path = dest / f"{name}.npz"
             print(f"  {path.name} {path.stat().st_size / 1e6:.1f}MB")
         return
 
-    cfg = load_config(args.config)
-    data_path = resolve_data_path(cfg, args.data)
+    if any((dest / f"{name}.npz").exists() for name in names):
+        raise SystemExit("preserve old caches: choose a new --dest directory")
     t0 = time.perf_counter()
     data = load_panel(str(data_path))
     drop_task2_label(data)

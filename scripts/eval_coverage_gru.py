@@ -23,7 +23,7 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
 from src.config import load_config, resolve_data_path  # noqa: E402
-from src.dataset import load_eval_splits  # noqa: E402
+from src.dataset import load_eval_splits, split_cache_dir  # noqa: E402
 from src.metrics import mean_rank_ic, rank_ic_series  # noqa: E402
 from src.models.fusion import FusionModel, coverage_gate_blend, linear_blend  # noqa: E402
 from src.submit import save_submission  # noqa: E402
@@ -60,7 +60,7 @@ def main() -> None:
 
     cfg = load_config("configs/fusion_gru_blend.yaml")
     t0 = time.perf_counter()
-    cache_dir = ROOT / "outputs" / "split_cache"
+    cache_dir = split_cache_dir(ROOT)
     data_path = None
     if not (cache_dir / "valid.npz").is_file() or not (cache_dir / "test.npz").is_file():
         data_path = resolve_data_path(cfg, args.data)

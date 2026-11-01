@@ -23,7 +23,7 @@ from src.metrics import mean_rank_ic, rank_ic_series  # noqa: E402
 def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("--pred", required=True, help="npy of shape (T_split, S)")
-    parser.add_argument("--split", choices=["train", "valid", "test"], default="valid")
+    parser.add_argument("--split", choices=["train", "valid"], default="valid")
     parser.add_argument("--config", default="configs/default.yaml")
     parser.add_argument("--data", default=None)
     parser.add_argument("--dump-series", default=None, help="optional csv path for per-day RankIC")
@@ -32,7 +32,7 @@ def main() -> None:
     cfg = load_config(args.config)
     cache = split_cache_dir(ROOT)
     try:
-        split = load_split_cache(args.split, cache)
+        split = load_split_cache(args.split, cache, data_path=resolve_data_path(cfg, args.data))
         print(f"labels from cache {cache / (args.split + '.npz')}")
     except FileNotFoundError:
         data_path = resolve_data_path(cfg, args.data)

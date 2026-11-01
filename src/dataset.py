@@ -8,12 +8,15 @@ Causal contract:
 
 from __future__ import annotations
 
+import json
+import os
 from pathlib import Path
 from typing import Any, Iterator, Literal
 
 import numpy as np
 
 from .io import read_zstd, split_ranges
+from .provenance import CacheValidationError, array_sha256, canonical, file_sha256, panel_contract, validate_contract
 
 SplitName = Literal["train", "valid", "test", "history"]
 
@@ -21,7 +24,10 @@ _EPS = 1e-8
 
 
 def load_panel(path: str) -> dict[str, Any]:
-    return read_zstd(path)
+    source = file_sha256(path)
+    data = read_zstd(path)
+    data["_source_sha256"] = source
+    return data
 
 
 def drop_task2_label(data: dict[str, Any]) -> None:
@@ -74,7 +80,7 @@ def keep_recent_days(split: dict[str, Any], n_days: int) -> dict[str, Any]:
 
 def split_cache_dir(root: Path | None = None) -> Path:
     base = Path(root) if root is not None else Path(__file__).resolve().parents[1]
-    return base / "outputs" / "split_cache"
+    return Path(os.environ["JINGGE_SPLIT_CACHE"]) if os.environ.get("JINGGE_SPLIT_CACHE") else base / "outputs" / "split_cache"
 
 
 def industry_panel(split: dict[str, Any], industry_col: int = 6) -> np.ndarray:
@@ -83,78 +89,106 @@ def industry_panel(split: dict[str, Any], industry_col: int = 6) -> np.ndarray:
     return np.asarray(split["cat_x"][..., int(industry_col)])
 
 
-def dump_split_cache(
-    data: dict[str, Any],
-    dest: Path | None = None,
-    *,
-    industry_col: int = 6,
-    splits: tuple[str, ...] = ("train", "valid", "test"),
-) -> list[Path]:
-    """Save labels/masks/industry only. Fusion scripts can skip the 8.5GB panel."""
+def dump_split_cache(data: dict[str, Any], dest: Path | None = None, *,
+                     industry_col: int = 6, splits: tuple[str, ...] = ("train", "valid", "test")) -> list[Path]:
+    """Write versioned split caches. Test caches deliberately contain no labels."""
     dest = split_cache_dir() if dest is None else Path(dest)
+    contract = panel_contract(data, industry_col)
+    if any((dest / f"{name}.npz").exists() for name in splits):
+        raise CacheValidationError("refusing to overwrite cache; select a new destination")
     dest.mkdir(parents=True, exist_ok=True)
-    written: list[Path] = []
+    written = []
     for name in splits:
-        sl = slice_split(data, name)
+        start, end = split_bounds(data, name)
+        arrays = {
+            "mask_x": np.asarray(data["mask_x"][start:end], dtype=bool),
+            "industry": np.asarray(data["cat_x"][start:end, :, industry_col], dtype=np.int32),
+            "start": np.int64(start), "end": np.int64(end), "industry_col": np.int32(industry_col),
+        }
+        if name != "test":
+            arrays["y1"] = np.asarray(data["y1"][start:end], dtype=np.float32)
+            arrays["mask_y"] = np.asarray(data["mask_y"][start:end], dtype=bool)
+        meta = {"contract": contract, "split": name,
+                "hashes": {k: array_sha256(v) for k, v in arrays.items()}}
         path = dest / f"{name}.npz"
-        np.savez(
-            path,
-            y1=np.array(sl["y1"], dtype=np.float32, copy=True),
-            mask_x=np.array(sl["mask_x"], dtype=bool, copy=True),
-            mask_y=np.array(sl["mask_y"], dtype=bool, copy=True),
-            industry=np.array(sl["cat_x"][..., int(industry_col)], dtype=np.int16, copy=True),
-            start=np.int32(sl["start"]),
-            end=np.int32(sl["end"]),
-            industry_col=np.int32(industry_col),
-        )
+        np.savez(path, **arrays, manifest=np.array(canonical(meta)))
         written.append(path)
-        print(f"  wrote {path} y1={sl['y1'].shape} {path.stat().st_size / 1e6:.1f}MB")
     return written
 
 
-def load_split_cache(split: SplitName, dest: Path | None = None) -> dict[str, Any]:
+def _cache_source(data_path=None):
+    if data_path is None:
+        from .config import load_config, resolve_data_path
+        try:
+            data_path = resolve_data_path(load_config("configs/default.yaml"))
+        except FileNotFoundError as exc:
+            raise CacheValidationError("provide data_path or expected_contract to validate cache source") from exc
+    return file_sha256(data_path)
+
+
+def load_split_cache(split: SplitName, dest: Path | None = None, *,
+                     expected_contract: dict | None = None, data_path=None,
+                     source_sha256: str | None = None, industry_col: int = 6) -> dict[str, Any]:
     dest = split_cache_dir() if dest is None else Path(dest)
     path = dest / f"{split}.npz"
-    if not path.is_file():
-        raise FileNotFoundError(path)
-    with np.load(path) as z:
-        return {
-            "start": int(z["start"]),
-            "end": int(z["end"]),
-            "y1": np.array(z["y1"]),
-            "mask_x": np.array(z["mask_x"]),
-            "mask_y": np.array(z["mask_y"]),
-            "industry": np.array(z["industry"]),
-            "industry_col": int(z["industry_col"]),
-        }
+    with np.load(path, allow_pickle=False) as z:
+        if "manifest" not in z.files:
+            raise CacheValidationError(f"unverified legacy cache {path}; rebuild in a new directory")
+        meta = json.loads(str(z["manifest"]))
+        if expected_contract is None and source_sha256 is None:
+            source_sha256 = _cache_source(data_path)
+        validate_contract(meta["contract"], expected_contract, source_sha256, industry_col)
+        if meta["split"] != split:
+            raise CacheValidationError("cache split name mismatch")
+        required = {"mask_x", "industry", "start", "end", "industry_col"}
+        if split != "test":
+            required |= {"y1", "mask_y"}
+        if set(meta["hashes"]) != required or set(z.files) != required | {"manifest"}:
+            raise CacheValidationError("cache payload schema mismatch")
+        out = {k: np.array(z[k]) for k in required}
+        for k, value in out.items():
+            if array_sha256(value) != meta["hashes"][k]:
+                raise CacheValidationError(f"cache payload mismatch: {k}")
+        bounds = meta["contract"]["bounds"]
+        ranges = {"train": bounds[:2], "valid": bounds[1:3], "test": bounds[2:4]}
+        if split not in ranges or [int(out["start"]), int(out["end"])] != ranges[split]:
+            raise CacheValidationError("cache split boundaries mismatch")
+        shape = (int(out["end"] - out["start"]), meta["contract"]["shape"][1])
+        for key in required - {"start", "end", "industry_col"}:
+            if out[key].shape != shape:
+                raise CacheValidationError(f"cache shape mismatch: {key}")
+        out.update({k: int(out[k]) for k in ("start", "end", "industry_col")})
+        out["_cache_contract"] = meta["contract"]
+        return out
 
 
-def load_eval_splits(
-    *,
-    cache_dir: Path | None = None,
-    data_path: str | Path | None = None,
-    industry_col: int = 6,
-    splits: tuple[str, ...] = ("valid", "test"),
-    dump_if_missing: bool = True,
-) -> tuple[dict[str, dict[str, Any]], str]:
-    """Load valid/test labels from cache. Falls back to the full panel once and dumps."""
-    import gc
-
+def load_eval_splits(*, cache_dir: Path | None = None, data_path=None,
+                     industry_col: int = 6, splits: tuple[str, ...] = ("valid", "test"),
+                     dump_if_missing: bool = True, expected_contract: dict | None = None):
+    """Validate every cache. Invalid/legacy caches never get silently overwritten."""
     cache_dir = split_cache_dir() if cache_dir is None else Path(cache_dir)
     if all((cache_dir / f"{name}.npz").is_file() for name in splits):
-        return {name: load_split_cache(name, cache_dir) for name in splits}, "cache"
-    if data_path is None:
-        missing = [name for name in splits if not (cache_dir / f"{name}.npz").is_file()]
-        raise FileNotFoundError(
-            f"split cache missing {missing} under {cache_dir}; run scripts/dump_split_cache.py"
-        )
+        source = _cache_source(data_path) if expected_contract is None else None
+        result = {}
+        contract = expected_contract
+        for name in splits:
+            result[name] = load_split_cache(name, cache_dir, expected_contract=contract,
+                source_sha256=source, industry_col=industry_col)
+            contract = result[name]["_cache_contract"]
+        return result, "verified-cache"
+    if data_path is None or not dump_if_missing:
+        raise CacheValidationError("cache missing; explicitly build a verified cache in a new directory")
+    if any((cache_dir / f"{name}.npz").exists() for name in splits):
+        raise CacheValidationError("partial cache exists; choose a new directory instead of overwriting")
     data = load_panel(str(data_path))
     drop_task2_label(data)
-    if dump_if_missing:
-        dump_split_cache(data, cache_dir, industry_col=industry_col)
+    contract = panel_contract(data, industry_col)
+    if expected_contract is not None:
+        validate_contract(contract, expected_contract, None, industry_col)
+    dump_split_cache(data, cache_dir, industry_col=industry_col, splits=splits)
     del data
-    gc.collect()
-    return {name: load_split_cache(name, cache_dir) for name in splits}, "panel+dump"
+    return load_eval_splits(cache_dir=cache_dir, splits=splits, industry_col=industry_col,
+                            expected_contract=contract)
 
 
 def iter_days(split_data: dict[str, Any]) -> Iterator[dict[str, Any]]:

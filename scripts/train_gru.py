@@ -87,17 +87,19 @@ def main() -> None:
 
     model = GRUModel(gru_cfg, seed=seed)
     t1 = time.perf_counter()
-    model.prepare_features(data)
     init_ckpt = paths.get("init_checkpoint")
     if init_ckpt:
+        requested_features = model.feature_spec()
         init_path = ROOT / str(init_ckpt)
         if not init_path.is_file():
             raise SystemExit(f"missing init_checkpoint {init_path}")
-        model.load(init_path)
-        model.cfg = {**model.cfg, **gru_cfg}
-        model.freeze_backbone = bool(gru_cfg.get("freeze_backbone", False))
-        model.max_train_stocks = gru_cfg.get("max_train_stocks_per_day")
-        print(f"loaded init_checkpoint={init_path}")
+        model.load(init_path, training_overrides={k: v for k, v in gru_cfg.items()
+                   if k in {"lr", "weight_decay", "max_epochs", "patience", "freeze_backbone",
+                            "max_train_stocks_per_day", "log_every_days"}})
+        if model.feature_spec() != requested_features:
+            raise ValueError("training config conflicts with checkpoint features; align config explicitly")
+        print(f"loaded init_checkpoint={init_path} features={model.feature_spec()}")
+    model.prepare_features(data)
     _drop_heavy_panels(data, valid, test)
     print(f"cs cache {time.perf_counter() - t1:.1f}s; dropped num_x/cat_x")
 

@@ -1,0 +1,15 @@
+{
+  "protocol_id": "r11_p20_v1",
+  "official_bounds": [486, 2918, 3161, 3603],
+  "label": {"name": "y1", "meaning": "unknown", "horizon_steps": null, "availability_lag_steps": null},
+  "purge_steps": 20,
+  "purge_status": "exploratory_buffer_not_verified_horizon_bound",
+  "folds": {"F1": [2189, 2432], "F2": [2432, 2675], "F3": [2675, 2918]},
+  "seed": 42,
+  "selection": "no_outer_fold_early_stopping; freeze_budget_or_use_purged_inner_holdout",
+  "fusion": "F1_fixed; later_folds_fit_only_matured_prior_oof_labels",
+  "max_candidates": 3,
+  "max_protocol_revisions_after_scores": 0,
+  "score_space": "rank",
+  "artifact_root": "outputs/oof_r11"
+}

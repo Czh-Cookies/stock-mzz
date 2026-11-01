@@ -12,6 +12,42 @@ import numpy as np
 from scipy.stats import rankdata
 
 
+class ScorePanel(np.ndarray):
+    """In-memory score-space tag; disk arrays need an explicit space contract."""
+    def __new__(cls, values, space):
+        obj = np.asarray(values).view(cls)
+        obj.score_space = space
+        return obj
+
+    def __array_finalize__(self, obj):
+        self.score_space = getattr(obj, "score_space", "raw")
+
+
+def _same_space(*panels):
+    spaces = {getattr(p, "score_space", "raw") for p in panels if p is not None}
+    if len(spaces) > 1:
+        raise ValueError(f"mixed score spaces {sorted(spaces)}; normalize all branches explicitly")
+    return next(iter(spaces), "raw")
+
+
+def panel_zscore(pred, mask):
+    a = np.asarray(pred, dtype=np.float64)
+    mask = np.asarray(mask, dtype=bool)
+    if a.shape != mask.shape or not np.isfinite(a[mask]).all():
+        raise ValueError("invalid score panel/mask")
+    out = np.zeros(a.shape, dtype=np.float32)
+    for t in range(len(a)):
+        v = a[t, mask[t]]
+        if v.size and v.std() > 0:
+            out[t, mask[t]] = (v - v.mean()) / v.std()
+    return ScorePanel(out, "zscore")
+
+
+def blend_in_space(a, b, mask, weight, space="rank"):
+    """Normalize both branches; raw is the explicit historical, scale-sensitive mode."""
+    return linear_blend(prepare_branch(a, mask, space), prepare_branch(b, mask, space), weight)
+
+
 def coverage_gate_blend(
     temporal: np.ndarray,
     cross_section: np.ndarray,
@@ -25,8 +61,11 @@ def coverage_gate_blend(
     if space == "rank":
         temporal = panel_cs_rank(temporal, mask_x)
         cross_section = panel_cs_rank(cross_section, mask_x)
+    elif space == "zscore":
+        temporal, cross_section = panel_zscore(temporal, mask_x), panel_zscore(cross_section, mask_x)
     elif space != "raw":
         raise ValueError(f"unknown coverage space {space!r}")
+    _same_space(temporal, cross_section)
     n_x = np.asarray(mask_x).sum(axis=1)
     high = n_x >= float(tau)
     pred = np.empty_like(temporal, dtype=np.float32)
@@ -39,8 +78,11 @@ def linear_blend(temporal: np.ndarray, cross_section: np.ndarray, weight: float)
     """weight 是时序支的权重，0 表示纯截面，1 表示纯时序。"""
     if temporal.shape != cross_section.shape:
         raise ValueError(f"shape mismatch: {temporal.shape} vs {cross_section.shape}")
+    score_space = _same_space(temporal, cross_section)
     w = float(weight)
-    return (w * temporal + (1.0 - w) * cross_section).astype(np.float32)
+    if not np.isfinite(w) or not 0 <= w <= 1:
+        raise ValueError("blend weight must be in [0, 1]")
+    return ScorePanel((w * temporal + (1.0 - w) * cross_section).astype(np.float32), score_space)
 
 
 def stack_mlp_blend(
@@ -81,18 +123,20 @@ def panel_rank_mean(preds: list[np.ndarray], mask: np.ndarray) -> np.ndarray:
         raise ValueError("panel_rank_mean needs at least one panel")
     ranks = [panel_cs_rank(p, mask) for p in preds]
     out = np.mean(np.stack(ranks, axis=0), axis=0)
-    return np.asarray(out, dtype=np.float32)
+    return ScorePanel(np.asarray(out, dtype=np.float32), "rank")
 
 
 def panel_cs_rank(pred: np.ndarray, mask: np.ndarray) -> np.ndarray:
     """Each day: rank among mask=True stocks. Invalid stays 0."""
+    if pred.shape != mask.shape or not np.isfinite(np.asarray(pred)[mask.astype(bool)]).all():
+        raise ValueError("invalid score panel/mask")
     out = np.zeros_like(pred, dtype=np.float32)
     for t in range(pred.shape[0]):
         m = np.asarray(mask[t], dtype=bool)
         if int(m.sum()) < 2:
             continue
         out[t, m] = rankdata(pred[t, m], method="average").astype(np.float32)
-    return out
+    return ScorePanel(out, "rank")
 
 
 def neutralize_industry(pred: np.ndarray, industry: np.ndarray, mask: np.ndarray) -> np.ndarray:
@@ -289,15 +333,17 @@ def prepare_branch(
     group_z: bool = False,
 ) -> np.ndarray:
     """Same-day rank / industry z-score. No future days."""
-    out = np.asarray(pred, dtype=np.float32)
+    out = pred
     if space == "rank":
         out = panel_cs_rank(out, mask_x)
+    elif space == "zscore":
+        out = panel_zscore(out, mask_x)
     elif space != "raw":
         raise ValueError(f"unknown space {space!r}")
     if group_z:
         if industry is None:
             raise ValueError("group_z needs industry")
-        out = panel_group_zscore(out, industry, mask_x)
+        out = ScorePanel(panel_group_zscore(out, industry, mask_x), "industry_zscore")
     return out
 
 
@@ -323,6 +369,9 @@ def coverage_stock_three_way(
     Day gate: high listing-count days get more GRU (soft logistic, or hard step if hard=True).
     Stock gate: names with denser past listings get extra GRU weight; sparse names keep the tree.
     """
+    score_space = _same_space(gru, tree, mlp)
+    if not 0 <= w_mlp <= 1 or (w_mlp != 0 and mlp is None):
+        raise ValueError("invalid MLP weight or missing MLP branch")
     n_x = np.asarray(mask_x).sum(axis=1).astype(np.float64)
     if hard:
         alpha = (n_x >= float(tau)).astype(np.float64)
@@ -338,4 +387,4 @@ def coverage_stock_three_way(
     out = w * np.asarray(gru, dtype=np.float64) + w_t * np.asarray(tree, dtype=np.float64)
     if mlp is not None and w_m != 0.0:
         out = out + w_m * np.asarray(mlp, dtype=np.float64)
-    return out.astype(np.float32)
+    return ScorePanel(out.astype(np.float32), score_space)

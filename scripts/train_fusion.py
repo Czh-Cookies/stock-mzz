@@ -18,7 +18,7 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
 from src.config import load_config, resolve_data_path  # noqa: E402
-from src.dataset import industry_panel, load_eval_splits  # noqa: E402
+from src.dataset import industry_panel, load_eval_splits, split_cache_dir  # noqa: E402
 from src.metrics import mean_rank_ic  # noqa: E402
 from src.models.fusion import FusionModel  # noqa: E402
 from src.submit import save_submission  # noqa: E402
@@ -38,7 +38,7 @@ def main() -> None:
 
     t0 = time.perf_counter()
     data_path = None
-    cache_dir = ROOT / "outputs" / "split_cache"
+    cache_dir = split_cache_dir(ROOT)
     if not (cache_dir / "valid.npz").is_file() or not (cache_dir / "test.npz").is_file():
         data_path = resolve_data_path(cfg, args.data)
     splits, src = load_eval_splits(

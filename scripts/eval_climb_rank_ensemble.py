@@ -128,7 +128,7 @@ def main() -> None:
     mlp_v, mlp_t = mlp
 
     pred_v = n2000_hard_gate_mlp(
-        mix_v, tree_v, mlp_v, valid["mask_x"], tau, W_LOW, W_HIGH, W_MLP, "raw", "rank"
+        mix_v, tree_v, mlp_v, valid["mask_x"], tau, W_LOW, W_HIGH, W_MLP, "rank", "rank"
     )
     ic = float(mean_rank_ic(pred_v, valid["y1"], valid["mask_y"]))
     print(f"CLIMB_VALID_RANKIC {ic:.6f}  grus={used}")
@@ -137,20 +137,21 @@ def main() -> None:
         print("single GRU; rank ensemble had nothing extra to average")
 
     pred_t = n2000_hard_gate_mlp(
-        mix_t, tree_t, mlp_t, test["mask_x"], tau, W_LOW, W_HIGH, W_MLP, "raw", "rank"
+        mix_t, tree_t, mlp_t, test["mask_x"], tau, W_LOW, W_HIGH, W_MLP, "rank", "rank"
     )
-    np.save(ROOT / "outputs/fusion_climb_rank_ensemble_valid.npy", pred_v)
-    np.save(ROOT / "outputs/fusion_climb_rank_ensemble_test.npy", pred_t)
-    out = ROOT / "submissions/task1_fusion_climb_rank_ensemble.npy"
+    np.save(ROOT / "outputs/fusion_climb_rank_ensemble_r0_rank_valid.npy", pred_v)
+    np.save(ROOT / "outputs/fusion_climb_rank_ensemble_r0_rank_test.npy", pred_t)
+    out = ROOT / "submissions/task1_fusion_climb_rank_ensemble_r0_rank.npy"
     save_submission(pred_t, out)
     meta = {
         "valid_rankic": ic,
         "grus": used,
         "tree": tree_note,
+        "score_space": "rank (all gate branches); R0 scale correction",
         "gate": {"tau_q": TAU_Q, "tau": tau, "weight_low": W_LOW, "weight_high": W_HIGH, "mlp": W_MLP},
         "note": "no valid grid; conservative gate; does not overwrite task1_y1_upload.npy",
     }
-    (ROOT / "outputs/fusion_climb_rank_ensemble_lock.json").write_text(
+    (ROOT / "outputs/fusion_climb_rank_ensemble_r0_rank_lock.json").write_text(
         json.dumps(meta, ensure_ascii=False, indent=2),
         encoding="utf-8",
     )
